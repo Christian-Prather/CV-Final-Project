@@ -53,17 +53,7 @@ def denoise_image():
     cv2.imshow("Threshold", threshold_image)
     cv2.imshow("Morph", morph)
 
-    # Blob detection
-    # params = cv2.SimpleBlobDetector_Params()
-    # # Area
-    # params.filterByArea = True
-    # params.minArea = 100.0
-    # params.maxArea = 100000000.0
-
-    # detector = cv2.SimpleBlobDetector_create(params)
-    # keypoints = detector.detect(morph)
-    # for point in keypoints:
-    #     print(point.pt)    
+ 
 
 
     # _, _, stats, centroids = cv2.connectedComponentsWithStats(morph, connectivity=4)
@@ -128,6 +118,20 @@ def denoise_image():
     # morph = cv2.resize(morph, (bgr_img.shape[1], bgr_img.shape[0]))
     test_image = cv2.bitwise_or(bgr_img, bgr_img, mask= morph)
     cv2.imshow("Test", test_image)
+
+   # Blob detection
+    params = cv2.SimpleBlobDetector_Params()
+    # Area
+    params.filterByArea = True
+    params.minArea = 100.0
+    params.maxArea = 100000000.0
+
+    detector = cv2.SimpleBlobDetector_create(params)
+    keypoints = detector.detect(test_image)
+    for point in keypoints:
+        print(point.pt)    
+
+
     cv2.waitKey(0)
 
     # return bgr_img, centroids
