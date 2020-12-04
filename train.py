@@ -9,6 +9,8 @@ from tensorflow.python.framework.convert_to_constants import convert_variables_t
 import pathlib
 import numpy as np
 import datetime
+import matplotlib.pyplot as plt
+
 print(tf.__version__)
 print("Make sure keras version ends in -tf", keras.__version__)
 
@@ -17,8 +19,10 @@ test_data_dir = pathlib.Path("/home/christian/Documents/PlantVillage-Dataset-mas
 
 train_image_count = len(list(train_data_dir.glob('*/*.JPG')))
 train_image_count = train_image_count * 0.8
+test_image_count = len(list(test_data_dir.glob('*/*.JPG')))
 
-
+class_abbreviations = np.array([item.name[0] for item in train_data_dir.glob('*') if (item.name != "place.txt") and (item.name!= ".DS_Store")])
+# class_abbreviations = ["S", "BR", "R", "H"]
 
 BATCH_SIZE = 16
 SEED = 1
@@ -32,7 +36,7 @@ number_of_classes = len(CLASSES)
 
 LOSS = "sparse_categorical_crossentropy"
 OPTIMIZER = "sgd"
-EPOCHS = 1
+EPOCHS = 10
 STEPS_PER_EPOCH = np.floor(train_image_count/ BATCH_SIZE)
 
 
@@ -77,6 +81,10 @@ def load_images():
                                                             class_mode = "sparse")
 
     return train_image_gen, validation_image_gen, test_image_gen
+
+
+
+
 # Save checkpoints
 model_checkpoint = ModelCheckpoint('./model/frozen_models/checkpoint.h5', 
                                     monitor='loss', 
@@ -86,27 +94,63 @@ model_checkpoint = ModelCheckpoint('./model/frozen_models/checkpoint.h5',
 callbacks_list = [model_checkpoint]
 
 def build_model():
-    model = keras.models.Sequential()
-    # model.add(keras.layers.Flatten(input_shape=[IMG_HEIGHT,IMG_WIDTH, 3]))
-    # model.add(keras.layers.Dense(300, activation="relu"))
-    # model.add(keras.layers.Dense(100, activation="relu"))
-    # model.add(keras.layers.Dense(number_of_classes, activation = "softmax"))
-    
+    model = keras.models.Sequential()   
     model.add(keras.layers.Conv2D(64, kernel_size=3, activation="relu", input_shape=(IMG_HEIGHT,IMG_WIDTH,3)))
     model.add(keras.layers.Conv2D(32, kernel_size=3, activation="relu"))
     model.add(keras.layers.MaxPool2D())
     model.add(keras.layers.Conv2D(16, kernel_size=3, activation="relu"))
     model.add(keras.layers.MaxPool2D())
-
     model.add(keras.layers.Flatten())
-    # model.add(keras.layers.Dense(100, activation="relu"))
     model.add(keras.layers.Dense(number_of_classes, activation="softmax"))
-
     return model
+
+
+
+def plot_image(i, predictions_array, true_labels, img):
+    true_label, img = int(true_labels[i]), img[i]
+    plt.grid(False)
+    plt.xticks([])
+    plt.yticks([])
+
+    img = np.reshape(img, (IMG_HEIGHT, IMG_WIDTH, 3))
+    plt.imshow(img, cmap=plt.cm.binary)
+
+    predicted_label = np.argmax(predictions_array)
+    if predicted_label == true_label:
+      color = 'blue'
+    else:
+      color = 'red'
+
+    plt.xlabel("{} {:2.0f}% ({})".format(CLASSES[predicted_label],
+                                  100*np.max(predictions_array),
+                                  CLASSES[true_label]),
+                                  color=color)
+
+def plot_value_array(i, predictions_array, true_labels):
+    true_label = int(true_labels[i])
+    plt.grid(False)
+    plt.xticks(range(4), class_abbreviations)
+    plt.yticks([])
+    thisplot = plt.bar(range(4), predictions_array, color="#777777")
+    plt.ylim([0, 1])
+    predicted_label = np.argmax(predictions_array)
+
+    thisplot[predicted_label].set_color('red')
+    thisplot[true_label].set_color('blue')
+
+
 
 
 def main():
     train, validation, test = load_images()
+    test_steps_per_epoch = np.math.ceil(test.samples / test.batch_size)                       
+    test_images = []
+    test_labels = []
+    for i in range(test_image_count):
+        (image, label) = next(test)
+        test_images.append(image)
+        test_labels.append(label)
+    
     model = build_model()
     print(model.summary())
 
@@ -143,6 +187,24 @@ def main():
                     logdir="./model/frozen_models",
                     name="frozen_graph.pb",
                     as_text=False)
+    
+    probability_model = keras.models.Sequential([model, keras.layers.Softmax()])
+    # predictions = probability_model.predict(test_images)
+    predictions = []
+    for i in range(len(test_images)):
+        predictions.append(probability_model.predict(test_images[i]))
+
+    num_rows = 4
+    num_cols = 6
+    num_images = num_rows*num_cols
+    plt.figure(figsize=(2*2*num_cols, 2*num_rows))
+    for i in range(num_images):
+        plt.subplot(num_rows, 2*num_cols, 2*i+1)
+        plot_image(i, predictions[i][0], test_labels, test_images)
+        plt.subplot(num_rows, 2*num_cols, 2*i+2)
+        plot_value_array(i, predictions[i][0], test_labels)
+    plt.tight_layout()
+    plt.savefig('model/predictions' + date_time.strftime("%Y%m%d-%H%M%S.png"))
 
 
 if __name__ == "__main__":
