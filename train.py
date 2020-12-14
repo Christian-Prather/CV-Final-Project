@@ -1,7 +1,10 @@
+# Neural Net training for classification of disease for infected apples
+# Authors: George Truman, Harry Dodwell, Christian Prather
+#
+
+# General imports
 import tensorflow as tf
 from tensorflow import keras
-# from tensorflow.keras import Sequential
-# from tensorflow.keras.layers import Dense, Dropout
 from tensorflow.keras.preprocessing.image import ImageDataGenerator
 from tensorflow.keras.callbacks import ModelCheckpoint
 from tensorflow.python.framework.convert_to_constants import convert_variables_to_constants_v2
@@ -11,39 +14,43 @@ import numpy as np
 import datetime
 import matplotlib.pyplot as plt
 
+# Confirm tensorflow version
 print(tf.__version__)
 print("Make sure keras version ends in -tf", keras.__version__)
 
+# Data paths
 train_data_dir = pathlib.Path("/home/christian/Documents/PlantVillage-Dataset-master/raw/color")
 test_data_dir = pathlib.Path("/home/christian/Documents/PlantVillage-Dataset-master/raw/testing")
 
+# Get number of images in folders
 train_image_count = len(list(train_data_dir.glob('*/*.JPG')))
 train_image_count = train_image_count * 0.8
 test_image_count = len(list(test_data_dir.glob('*/*.JPG')))
 
+# Appreviations for test plot
 class_abbreviations = np.array([item.name[0] for item in train_data_dir.glob('*') if (item.name != "place.txt") and (item.name!= ".DS_Store")])
-# class_abbreviations = ["S", "BR", "R", "H"]
 
+# Constant defines
 BATCH_SIZE = 16
 SEED = 1
-
-IMG_HEIGHT = 500
-IMG_WIDTH = 500
-
-CLASSES = np.array([item.name for item in train_data_dir.glob('*') if (item.name != ".DS_Store")])
-print("Class Names: ", CLASSES)
-number_of_classes = len(CLASSES)
-
 LOSS = "sparse_categorical_crossentropy"
 OPTIMIZER = "sgd"
 EPOCHS = 10
 STEPS_PER_EPOCH = np.floor(train_image_count/ BATCH_SIZE)
 
+# Training data image size
+IMG_HEIGHT = 500
+IMG_WIDTH = 500
 
+# Classes
+CLASSES = np.array([item.name for item in train_data_dir.glob('*') if (item.name != ".DS_Store")])
+print("Class Names: ", CLASSES)
+number_of_classes = len(CLASSES)
+
+# General info
 print("Train dir: {} BATCH_SIZE: {} SEED {}".format(train_data_dir, BATCH_SIZE, SEED))
 
-
-
+# Data load generators to load images in batches from directories
 def load_images():
     image_genrator = ImageDataGenerator(rescale = 1./255,
                                         rotation_range = 20,
@@ -93,6 +100,7 @@ model_checkpoint = ModelCheckpoint('./model/frozen_models/checkpoint.h5',
 
 callbacks_list = [model_checkpoint]
 
+# Comon Conv2D model architecture
 def build_model():
     model = keras.models.Sequential()   
     model.add(keras.layers.Conv2D(64, kernel_size=3, activation="relu", input_shape=(IMG_HEIGHT,IMG_WIDTH,3)))
@@ -105,7 +113,7 @@ def build_model():
     return model
 
 
-
+# Run through the test image folder checking for the predicted classification
 def plot_image(i, predictions_array, true_labels, img):
     true_label, img = int(true_labels[i]), img[i]
     plt.grid(False)
@@ -126,6 +134,7 @@ def plot_image(i, predictions_array, true_labels, img):
                                   CLASSES[true_label]),
                                   color=color)
 
+# Plot test results
 def plot_value_array(i, predictions_array, true_labels):
     true_label = int(true_labels[i])
     plt.grid(False)
@@ -138,9 +147,7 @@ def plot_value_array(i, predictions_array, true_labels):
     thisplot[predicted_label].set_color('red')
     thisplot[true_label].set_color('blue')
 
-
-
-
+# Entry point of the program
 def main():
     train, validation, test = load_images()
     test_steps_per_epoch = np.math.ceil(test.samples / test.batch_size)                       
@@ -167,6 +174,7 @@ def main():
 
     date_time = datetime.datetime.now()
 
+    # Save model
     model.load_weights('./model/frozen_models/checkpoint.h5')
 
     model.save('./model/frozen_models/frozen_keras.h5')
@@ -189,11 +197,11 @@ def main():
                     as_text=False)
     
     probability_model = keras.models.Sequential([model, keras.layers.Softmax()])
-    # predictions = probability_model.predict(test_images)
     predictions = []
     for i in range(len(test_images)):
         predictions.append(probability_model.predict(test_images[i]))
 
+    # Test plot layout
     num_rows = 4
     num_cols = 6
     num_images = num_rows*num_cols
